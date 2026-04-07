@@ -1,0 +1,8 @@
+{
+  "name": "weather-agent",
+  "version": "1.0.0",
+  "description": "Claude-powered weather assistant",
+  "engines": {
+    "node": ">=18"
+  }
+}

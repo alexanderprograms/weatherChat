@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Agent</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    header { text-align: center; }
+    header h1 { font-size: 1.4rem; font-weight: 600; color: #1a1a1a; }
+    header p { font-size: 0.85rem; color: #888; margin-top: 4px; }
+
+    .chat-window {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 14px;
+      padding: 1.25rem;
+      min-height: 400px;
+      max-height: 560px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .empty-state {
+      margin: auto;
+      text-align: center;
+      color: #bbb;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .bubble-row { display: flex; flex-direction: column; gap: 2px; }
+    .bubble-row.user      { align-items: flex-end; }
+    .bubble-row.assistant { align-items: flex-start; }
+    .bubble-row.tool      { align-items: flex-start; }
+
+    .bubble {
+      max-width: 82%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .bubble-row.user .bubble {
+      background: #1a1a1a;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bubble-row.assistant .bubble {
+      background: #f1efe8;
+      color: #1a1a1a;
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble-row.tool .bubble {
+      background: #e6f1fb;
+      color: #185fa5;
+      border-bottom-left-radius: 4px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+
+    .bubble.thinking { color: #999; font-style: italic; }
+    .role-label { font-size: 11px; color: #bbb; padding: 0 4px; }
+
+    .input-bar {
+      display: flex;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      align-items: flex-end;
+    }
+
+    .input-bar textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      line-height: 1.5;
+      max-height: 120px;
+      overflow-y: auto;
+      background: transparent;
+      color: #1a1a1a;
+    }
+
+    .input-bar button {
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+
+    .input-bar button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-row button.clear { font-size: 12px; color: #aaa; background: none; border: none; cursor: pointer; }
+    .footer-row button.clear:hover { color: #555; }
+    .footer-row span { font-size: 11px; color: #ccc; }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .suggestions button {
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      padding: 6px 12px;
+      cursor: pointer;
+      color: #555;
+      transition: background 0.15s;
+    }
+    .suggestions button:hover { background: #f1efe8; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Weather Agent</h1>
+    <p>Claude-powered weather assistant</p>
+  </header>
+
+  <div class="suggestions">
+    <button onclick="prefill(`What's the weather like in Dublin right now?`)">Dublin weather</button>
+    <button onclick="prefill(`Is it going to rain in London today?`)">Rain in London?</button>
+    <button onclick="prefill(`Compare the weather in Paris and Berlin`)">Paris vs Berlin</button>
+    <button onclick="prefill(`Should I bring a jacket in New York today?`)">NYC jacket check</button>
+  </div>
+
+  <div class="chat-window" id="chatWindow">
+    <div class="empty-state" id="emptyState">
+      Ask me about the weather anywhere in the world.<br/>
+      <span style="font-size:12px; color:#ddd;">Watch the blue bubble when I fetch live data.</span>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <textarea id="userInput" rows="1" placeholder="Ask about the weather anywhere..." onkeydown="handleKey(event)"></textarea>
+    <button id="sendBtn" onclick="runAgent()" title="Send">↑</button>
+  </div>
+
+  <div class="footer-row">
+    <button class="clear" onclick="clearChat()">Clear conversation</button>
+    <span>Weather data: Open-Meteo (free)</span>
+  </div>
+
+</div>
+
+<script>
+  const TOOLS = [
+    {
+      name: "get_weather",
+      description: "Get the current weather for a city. Returns temperature, wind speed, and weather condition. Use this whenever the user asks about weather, temperature, rain, or what to wear.",
+      input_schema: {
+        type: "object",
+        properties: {
+          city: {
+            type: "string",
+            description: "The city name, e.g. 'Dublin', 'London', 'Tokyo'"
+          },
+          country_code: {
+            type: "string",
+            description: "Optional 2-letter ISO country code, e.g. 'IE', 'GB', 'JP'"
+          }
+        },
+        required: ["city"]
+      }
+    }
+  ];
+
+  const SYSTEM_PROMPT = `You are a friendly weather assistant. When users ask about weather, always use the get_weather tool to get real current data — never guess or make up weather information. After getting the data, give a helpful, conversational response. If asked to compare cities, call the tool once per city.`;
+
+  // ── KEY CHANGE: we now call our own backend instead of Anthropic directly ──
+  // The API key is stored safely on the server in an environment variable
+  async function callClaude(messages) {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        tools: TOOLS,
+        messages
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async function executeTool(toolName, input) {
+    if (toolName !== "get_weather") throw new Error(`Unknown tool: ${toolName}`);
+
+    const { city } = input;
+
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+    const geoData = await geoRes.json();
+
+    if (!geoData.results || geoData.results.length === 0) {
+      return { error: `Could not find location: ${city}` };
+    }
+
+    const place = geoData.results[0];
+    const { latitude, longitude, name: placeName, country } = place;
+
+    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,precipitation&timezone=auto`);
+    const weatherData = await weatherRes.json();
+    const current = weatherData.current;
+
+    return {
+      city: placeName,
+      country,
+      temperature_celsius: current.temperature_2m,
+      feels_like_celsius: current.apparent_temperature,
+      condition: decodeWeatherCode(current.weathercode),
+      wind_speed_kmh: current.windspeed_10m,
+      precipitation_mm: current.precipitation
+    };
+  }
+
+  function decodeWeatherCode(code) {
+    const codes = {
+      0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+      45: "Foggy", 48: "Icy fog",
+      51: "Light drizzle", 53: "Moderate drizzle", 55: "Heavy drizzle",
+      61: "Light rain", 63: "Moderate rain", 65: "Heavy rain",
+      71: "Light snow", 73: "Moderate snow", 75: "Heavy snow",
+      80: "Light showers", 81: "Moderate showers", 82: "Heavy showers",
+      95: "Thunderstorm", 96: "Thunderstorm with hail"
+    };
+    return codes[code] || `Weather code ${code}`;
+  }
+
+  let history = [];
+  let busy = false;
+
+  async function runAgent() {
+    if (busy) return;
+
+    const text = document.getElementById('userInput').value.trim();
+    if (!text) return;
+
+    history.push({ role: "user", content: text });
+    renderBubble("user", text);
+    document.getElementById('userInput').value = '';
+    document.getElementById('userInput').style.height = 'auto';
+
+    busy = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    const thinkingBubble = renderBubble("assistant", "Thinking…", true);
+
+    try {
+      while (true) {
+        const data = await callClaude(history);
+
+        history.push({ role: "assistant", content: data.content });
+
+        if (data.stop_reason === "tool_use") {
+          thinkingBubble.closest('.bubble-row')?.remove();
+
+          const toolResults = [];
+
+          for (const block of data.content) {
+            if (block.type !== "tool_use") continue;
+            renderToolCall(block.name, block.input);
+
+            let result;
+            try {
+              result = await executeTool(block.name, block.input);
+            } catch (err) {
+              result = { error: err.message };
+            }
+
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: JSON.stringify(result)
+            });
+          }
+
+          history.push({ role: "user", content: toolResults });
+          continue;
+        }
+
+        if (data.stop_reason === "end_turn") {
+          const reply = data.content.find(b => b.type === "text")?.text || "(no response)";
+          const existing = document.querySelector('.bubble.thinking');
+          if (existing) {
+            existing.className = 'bubble';
+            existing.textContent = reply;
+          } else {
+            renderBubble("assistant", reply);
+          }
+          break;
+        }
+
+        break;
+      }
+    } catch (err) {
+      const existing = document.querySelector('.bubble.thinking');
+      if (existing) {
+        existing.className = 'bubble';
+        existing.style.color = '#a32d2d';
+        existing.textContent = `Error: ${err.message}`;
+      } else {
+        renderBubble("assistant", `Error: ${err.message}`);
+      }
+    } finally {
+      busy = false;
+      document.getElementById('sendBtn').disabled = false;
+    }
+  }
+
+  function renderBubble(role, text, isThinking = false) {
+    document.getElementById('emptyState')?.remove();
+    const chatWindow = document.getElementById('chatWindow');
+    const row = document.createElement('div');
+    row.className = `bubble-row ${role}`;
+    const label = document.createElement('div');
+    label.className = 'role-label';
+    label.textContent = role === 'user' ? 'You' : 'Claude';
+    const bubble = document.createElement('div');
+    bubble.className = `bubble${isThinking ? ' thinking' : ''}`;
+    bubble.textContent = text;
+    row.appendChild(label);
+    row.appendChild(bubble);
+    chatWindow.appendChild(row);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return bubble;
+  }
+
+  function renderToolCall(toolName, input) {
+    const chatWindow = document.getElementById('chatWindow');
+    const row = document.createElement('div');
+    row.className = 'bubble-row tool';
+    const label = document.createElement('div');
+    label.className = 'role-label';
+    label.textContent = 'tool call';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = `calling ${toolName}(${JSON.stringify(input)})`;
+    row.appendChild(label);
+    row.appendChild(bubble);
+    chatWindow.appendChild(row);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  function prefill(text) {
+    document.getElementById('userInput').value = text;
+    document.getElementById('userInput').focus();
+  }
+
+  function clearChat() {
+    history = [];
+    document.getElementById('chatWindow').innerHTML =
+      '<div class="empty-state" id="emptyState">Ask me about the weather anywhere in the world.<br/><span style="font-size:12px;color:#ddd;">Watch the blue bubble when I fetch live data.</span></div>';
+  }
+
+  const ta = document.getElementById('userInput');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runAgent(); }
+  }
+</script>
+</body>
+</html>
