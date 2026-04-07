@@ -233,14 +233,15 @@
 
   const SYSTEM_PROMPT = `You are a friendly weather assistant. When users ask about weather, always use the get_weather tool to get real current data — never guess or make up weather information. After getting the data, give a helpful, conversational response. If asked to compare cities, call the tool once per city.`;
 
-  // Updates the background using the photo URL returned from our server
+  // Routes the Unsplash image through our own proxy to avoid CORS blocks
   function updateBackground(photoUrl) {
     if (!photoUrl) return;
+    const proxied = `/api/image-proxy?url=${encodeURIComponent(photoUrl)}`;
     const img = new Image();
     img.onload = () => {
-      document.body.style.backgroundImage = `url('${photoUrl}')`;
+      document.body.style.backgroundImage = `url('${proxied}')`;
     };
-    img.src = photoUrl;
+    img.src = proxied;
   }
 
   async function callClaude(messages) {
