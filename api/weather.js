@@ -24,7 +24,15 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: `Weather service returned ${weatherRes.status}` });
     }
 
-    const weatherData = await weatherRes.json();
+    const rawText = await weatherRes.text();
+
+let weatherData;
+try {
+  weatherData = JSON.parse(rawText);
+} catch (e) {
+  console.error("Invalid JSON from wttr:", rawText.slice(0, 200));
+  return res.status(502).json({ error: "Weather API returned invalid JSON" });
+}
     const current = weatherData.current_condition[0];
     const area = weatherData.nearest_area[0];
 
