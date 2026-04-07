@@ -1,5 +1,5 @@
 // api/weather.js
-// Fetches weather from wttr.in and a matching photo from Unsplash — all server-side
+// Fetches weather from wttr.in and a matching photo from Pexels
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'city is required' });
   }
 
-  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+  const pexelsKey = process.env.PEXELS_API_KEY;
 
   try {
     // ── Step 1: Fetch weather ──────────────────────────────
@@ -29,12 +29,10 @@ export default async function handler(req, res) {
     const area = weatherData.nearest_area[0];
 
     const condition = current.weatherDesc[0].value;
-    const cityName = area.areaName[0].value;
-    const country = area.country[0].value;
 
     const weather = {
-      city: cityName,
-      country,
+      city: area.areaName[0].value,
+      country: area.country[0].value,
       temperature_celsius: parseInt(current.temp_C),
       feels_like_celsius: parseInt(current.FeelsLikeC),
       condition,
@@ -43,32 +41,38 @@ export default async function handler(req, res) {
       humidity_percent: parseInt(current.humidity)
     };
 
-    // ── Step 2: Fetch a matching Unsplash photo ────────────
-    // Build a search query from the weather condition
-    const c = condition.toLowerCase();
-    let searchQuery = 'sky clouds landscape';
-    if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) searchQuery = 'rain storm weather';
-    else if (c.includes('snow') || c.includes('blizzard'))                    searchQuery = 'snow winter landscape';
-    else if (c.includes('clear') || c.includes('sunny'))                      searchQuery = 'sunny blue sky';
-    else if (c.includes('fog') || c.includes('mist'))                         searchQuery = 'fog mist landscape';
-    else if (c.includes('thunder') || c.includes('storm'))                    searchQuery = 'thunderstorm lightning';
-    else if (c.includes('overcast') || c.includes('cloudy'))                  searchQuery = 'overcast cloudy sky';
-
+    // ── Step 2: Fetch a matching Pexels photo ──────────────
     let photoUrl = null;
 
-    if (unsplashKey) {
-      const unsplashRes = await fetch(
-        `https://api.unsplash.com/photos/random?query=${encodeURIComponent(searchQuery)}&orientation=landscape&content_filter=high`,
-        { headers: { Authorization: `Client-ID ${unsplashKey}` } }
+    if (pexelsKey) {
+      const c = condition.toLowerCase();
+      let searchQuery = 'sky landscape';
+      if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) searchQuery = 'rain storm';
+      else if (c.includes('snow') || c.includes('blizzard'))                    searchQuery = 'snow winter';
+      else if (c.includes('clear') || c.includes('sunny'))                      searchQuery = 'sunny blue sky';
+      else if (c.includes('fog') || c.includes('mist'))                         searchQuery = 'fog mist';
+      else if (c.includes('thunder') || c.includes('storm'))                    searchQuery = 'thunderstorm';
+      else if (c.includes('overcast') || c.includes('cloudy'))                  searchQuery = 'cloudy sky';
+
+      const page = Math.floor(Math.random() * 5) + 1; // random page for variety
+      const pexelsRes = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=10&page=${page}`,
+        { headers: { Authorization: pexelsKey } }
       );
 
-      if (unsplashRes.ok) {
-        const photo = await unsplashRes.json();
-        // Use the regular size — good quality, not too large
-        photoUrl = photo.urls?.regular || null;
+      if (pexelsRes.ok) {
+        const pexelsData = await pexelsRes.json();
+        const photos = pexelsData.photos;
+        if (photos && photos.length > 0) {
+          const photo = photos[Math.floor(Math.random() * photos.length)];
+          // Use 'large2x' for a high quality landscape image
+          photoUrl = photo.src?.large2x || photo.src?.large || null;
+        }
       }
     }
 
+    // Set CORS headers so the browser can load the image directly
+    res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(200).json({ ...weather, photoUrl });
 
   } catch (err) {
