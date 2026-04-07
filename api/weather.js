@@ -1,5 +1,4 @@
 // api/weather.js
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
@@ -9,7 +8,6 @@ export default async function handler(req, res) {
   }
 
   const { city } = req.body;
-
   if (!city) {
     return res.status(400).json({ error: 'city is required' });
   }
@@ -17,7 +15,7 @@ export default async function handler(req, res) {
   const pexelsKey = process.env.PEXELS_API_KEY;
 
   try {
-    // ── Step 1: Fetch weather safely ──────────────────────
+    // ── Step 1: Fetch weather ──────────────────────────────
     const weatherRes = await fetch(
       `https://wttr.in/${encodeURIComponent(city)}?format=j1`,
       { headers: { 'User-Agent': 'weather-agent/1.0' } }
@@ -27,25 +25,23 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: `Weather service returned ${weatherRes.status}` });
     }
 
-    // 🔥 FIX: use text() instead of json()
     const rawText = await weatherRes.text();
-
     let weatherData;
     try {
       weatherData = JSON.parse(rawText);
     } catch (err) {
-      console.error("Invalid JSON from wttr:", rawText.slice(0, 200));
-      return res.status(502).json({ error: "Weather API returned invalid JSON" });
+      console.error('Invalid JSON from wttr:', rawText.slice(0, 200));
+      return res.status(502).json({ error: 'Weather API returned invalid JSON' });
     }
 
     const current = weatherData.current_condition?.[0];
     const area = weatherData.nearest_area?.[0];
 
     if (!current || !area) {
-      return res.status(500).json({ error: "Malformed weather data" });
+      return res.status(500).json({ error: 'Malformed weather data' });
     }
 
-    const condition = current.weatherDesc?.[0]?.value || "Unknown";
+    const condition = current.weatherDesc?.[0]?.value || 'Unknown';
 
     const weather = {
       city: area.areaName?.[0]?.value,
@@ -58,55 +54,39 @@ export default async function handler(req, res) {
       humidity_percent: parseInt(current.humidity)
     };
 
-    // ── Step 2: Fetch matching Pexels image ──────────────
+    // ── Step 2: Fetch matching Pexels image ────────────────
     let photoUrl = null;
 
     if (pexelsKey) {
       const c = condition.toLowerCase();
-
       let searchQuery = 'sky landscape';
+      if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) searchQuery = 'rain storm city';
+      else if (c.includes('snow') || c.includes('blizzard'))                    searchQuery = 'snow winter city';
+      else if (c.includes('clear') || c.includes('sunny'))                      searchQuery = 'sunny blue sky city';
+      else if (c.includes('fog') || c.includes('mist'))                         searchQuery = 'fog mist city';
+      else if (c.includes('thunder') || c.includes('storm'))                    searchQuery = 'thunderstorm sky';
+      else if (c.includes('overcast') || c.includes('cloudy'))                  searchQuery = 'cloudy sky city';
 
-      if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) {
-        searchQuery = 'rain storm city';
-      } else if (c.includes('snow') || c.includes('blizzard')) {
-        searchQuery = 'snow winter city';
-      } else if (c.includes('clear') || c.includes('sunny')) {
-        searchQuery = 'sunny blue sky city';
-      } else if (c.includes('fog') || c.includes('mist')) {
-        searchQuery = 'fog mist city';
-      } else if (c.includes('thunder') || c.includes('storm')) {
-        searchQuery = 'thunderstorm sky';
-      } else if (c.includes('overcast') || c.includes('cloudy')) {
-        searchQuery = 'cloudy sky city';
-      }
+      const page = Math.floor(Math.random() * 5) + 1; // fix: define page
 
-     console.log('Pexels key present:', !!pexelsKey);
-console.log('Pexels search query:', searchQuery);
+      const pexelsRes = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=10&page=${page}`,
+        { headers: { Authorization: pexelsKey } }
+      );
 
-const pexelsRes = await fetch(
-  `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=10&page=${page}`,
-  { headers: { Authorization: pexelsKey } }
-);
-
-console.log('Pexels response status:', pexelsRes.status);
-const pexelsData = await pexelsRes.json();
-console.log('Pexels photos count:', pexelsData.photos?.length);
-
-if (pexelsRes.ok) {
-        const pexelsData = await pexelsRes.json();
+      if (pexelsRes.ok) {
+        const pexelsData = await pexelsRes.json(); // fix: only parse once
         const photos = pexelsData.photos;
-
         if (photos?.length > 0) {
           const photo = photos[Math.floor(Math.random() * photos.length)];
           photoUrl = photo.src?.large2x || photo.src?.large || null;
         }
+      } else {
+        console.error('Pexels error:', pexelsRes.status);
       }
     }
 
-    return res.status(200).json({
-      ...weather,
-      photoUrl
-    });
+    return res.status(200).json({ ...weather, photoUrl });
 
   } catch (err) {
     console.error('Weather API error:', err);
