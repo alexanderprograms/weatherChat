@@ -258,6 +258,8 @@
   const id = set[Math.floor(Math.random() * set.length)];
   document.body.style.backgroundImage = `url('https://picsum.photos/id/${id}/1600/900')`;
 
+  }
+
   async function callClaude(messages) {
     const response = await fetch('/api/chat', {
       method: 'POST',
