@@ -80,17 +80,19 @@ export default async function handler(req, res) {
         searchQuery = 'cloudy sky city';
       }
 
-      // 🔥 IMPROVEMENT: include city for relevance
-      searchQuery = `${city} ${searchQuery}`;
+     console.log('Pexels key present:', !!pexelsKey);
+console.log('Pexels search query:', searchQuery);
 
-      const page = Math.floor(Math.random() * 5) + 1;
+const pexelsRes = await fetch(
+  `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=10&page=${page}`,
+  { headers: { Authorization: pexelsKey } }
+);
 
-      const pexelsRes = await fetch(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&orientation=landscape&per_page=10&page=${page}`,
-        { headers: { Authorization: pexelsKey } }
-      );
+console.log('Pexels response status:', pexelsRes.status);
+const pexelsData = await pexelsRes.json();
+console.log('Pexels photos count:', pexelsData.photos?.length);
 
-      if (pexelsRes.ok) {
+if (pexelsRes.ok) {
         const pexelsData = await pexelsRes.json();
         const photos = pexelsData.photos;
 
