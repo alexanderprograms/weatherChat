@@ -233,20 +233,35 @@
 
   const SYSTEM_PROMPT = `You are a friendly weather assistant. When users ask about weather, always use the get_weather tool to get real current data — never guess or make up weather information. After getting the data, give a helpful, conversational response. If asked to compare cities, call the tool once per city.`;
 
- function updateBackground(photoUrl) {
-  if (!photoUrl) return;
+function updateBackground(photoUrl) {
+  console.log("🖼️ updateBackground called with:", photoUrl);
+
+  if (!photoUrl) {
+    console.warn("⚠️ No photoUrl provided");
+    return;
+  }
 
   fetch(photoUrl)
     .then(res => {
-      if (!res.ok) throw new Error("Image failed to load");
+      console.log("📡 Image fetch response:", res);
+
+      if (!res.ok) {
+        throw new Error("Image failed to load");
+      }
+
       return res.blob();
     })
     .then(blob => {
+      console.log("📦 Blob created:", blob);
+
       const objectUrl = URL.createObjectURL(blob);
+      console.log("🔗 Object URL:", objectUrl);
+
       document.body.style.backgroundImage = `url('${objectUrl}')`;
+      console.log("✅ Background updated");
     })
     .catch(err => {
-      console.warn("Background image blocked:", err);
+      console.error("❌ Background image error:", err);
     });
 }
 
