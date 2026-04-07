@@ -237,47 +237,23 @@
     return response.json();
   }
 
+  // Calls our own /api/weather backend — avoids CORS issues
   async function executeTool(toolName, input) {
     if (toolName !== "get_weather") throw new Error(`Unknown tool: ${toolName}`);
 
-    const { city } = input;
+    const response = await fetch('/api/weather', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city: input.city })
+    });
 
-    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
-    const geoData = await geoRes.json();
+    const data = await response.json();
 
-    if (!geoData.results || geoData.results.length === 0) {
-      return { error: `Could not find location: ${city}` };
+    if (!response.ok) {
+      return { error: data.error || `HTTP ${response.status}` };
     }
 
-    const place = geoData.results[0];
-    const { latitude, longitude, name: placeName, country } = place;
-
-    const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,precipitation&timezone=auto`);
-    const weatherData = await weatherRes.json();
-    const current = weatherData.current;
-
-    return {
-      city: placeName,
-      country,
-      temperature_celsius: current.temperature_2m,
-      feels_like_celsius: current.apparent_temperature,
-      condition: decodeWeatherCode(current.weathercode),
-      wind_speed_kmh: current.windspeed_10m,
-      precipitation_mm: current.precipitation
-    };
-  }
-
-  function decodeWeatherCode(code) {
-    const codes = {
-      0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-      45: "Foggy", 48: "Icy fog",
-      51: "Light drizzle", 53: "Moderate drizzle", 55: "Heavy drizzle",
-      61: "Light rain", 63: "Moderate rain", 65: "Heavy rain",
-      71: "Light snow", 73: "Moderate snow", 75: "Heavy snow",
-      80: "Light showers", 81: "Moderate showers", 82: "Heavy showers",
-      95: "Thunderstorm", 96: "Thunderstorm with hail"
-    };
-    return codes[code] || `Weather code ${code}`;
+    return data;
   }
 
   let history = [];
