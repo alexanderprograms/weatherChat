@@ -9,12 +9,17 @@
 
     body {
       font-family: system-ui, sans-serif;
-      background: #f5f5f3;
+      background-image: url('https://source.unsplash.com/1600x900/?sky,clouds');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-color: #87CEEB;
       display: flex;
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
       padding: 2rem 1rem;
+      transition: background-image 1s ease;
     }
 
     .container {
@@ -26,13 +31,18 @@
     }
 
     header { text-align: center; }
-    header h1 { font-size: 1.4rem; font-weight: 600; color: #1a1a1a; }
-    header p { font-size: 0.85rem; color: #888; margin-top: 4px; }
+    header h1 { font-size: 1.4rem; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+    header p { font-size: 0.85rem; color: rgba(255,255,255,0.8); margin-top: 4px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+    .glass {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 14px;
+    }
 
     .chat-window {
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 14px;
       padding: 1.25rem;
       min-height: 400px;
       max-height: 560px;
@@ -45,7 +55,7 @@
     .empty-state {
       margin: auto;
       text-align: center;
-      color: #bbb;
+      color: rgba(0,0,0,0.4);
       font-size: 14px;
       line-height: 1.8;
     }
@@ -65,34 +75,31 @@
     }
 
     .bubble-row.user .bubble {
-      background: #1a1a1a;
+      background: rgba(26, 26, 26, 0.85);
       color: #fff;
       border-bottom-right-radius: 4px;
     }
 
     .bubble-row.assistant .bubble {
-      background: #f1efe8;
+      background: rgba(255, 255, 255, 0.75);
       color: #1a1a1a;
       border-bottom-left-radius: 4px;
     }
 
     .bubble-row.tool .bubble {
-      background: #e6f1fb;
+      background: rgba(230, 241, 251, 0.85);
       color: #185fa5;
       border-bottom-left-radius: 4px;
       font-size: 13px;
       font-family: monospace;
     }
 
-    .bubble.thinking { color: #999; font-style: italic; }
-    .role-label { font-size: 11px; color: #bbb; padding: 0 4px; }
+    .bubble.thinking { color: #888; font-style: italic; }
+    .role-label { font-size: 11px; color: rgba(0,0,0,0.35); padding: 0 4px; }
 
     .input-bar {
       display: flex;
       gap: 8px;
-      background: #fff;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
       padding: 10px 12px;
       align-items: flex-end;
     }
@@ -111,8 +118,10 @@
       color: #1a1a1a;
     }
 
+    .input-bar textarea::placeholder { color: rgba(0,0,0,0.35); }
+
     .input-bar button {
-      background: #1a1a1a;
+      background: rgba(26, 26, 26, 0.8);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -133,10 +142,18 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding: 0 4px;
     }
-    .footer-row button.clear { font-size: 12px; color: #aaa; background: none; border: none; cursor: pointer; }
-    .footer-row button.clear:hover { color: #555; }
-    .footer-row span { font-size: 11px; color: #ccc; }
+    .footer-row button.clear {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .footer-row button.clear:hover { color: #fff; }
+    .footer-row span { font-size: 11px; color: rgba(255,255,255,0.5); text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
 
     .suggestions {
       display: flex;
@@ -145,15 +162,17 @@
     }
     .suggestions button {
       font-size: 12px;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.7);
       border-radius: 20px;
       padding: 6px 12px;
       cursor: pointer;
-      color: #555;
+      color: #1a1a1a;
       transition: background 0.15s;
     }
-    .suggestions button:hover { background: #f1efe8; }
+    .suggestions button:hover { background: rgba(255,255,255,0.75); }
   </style>
 </head>
 <body>
@@ -171,21 +190,21 @@
     <button onclick="prefill(`Should I bring a jacket in New York today?`)">NYC jacket check</button>
   </div>
 
-  <div class="chat-window" id="chatWindow">
+  <div class="chat-window glass" id="chatWindow">
     <div class="empty-state" id="emptyState">
       Ask me about the weather anywhere in the world.<br/>
-      <span style="font-size:12px; color:#ddd;">Watch the blue bubble when I fetch live data.</span>
+      <span style="font-size:12px; color:rgba(0,0,0,0.25);">Watch the blue bubble when I fetch live data.</span>
     </div>
   </div>
 
-  <div class="input-bar">
+  <div class="input-bar glass">
     <textarea id="userInput" rows="1" placeholder="Ask about the weather anywhere..." onkeydown="handleKey(event)"></textarea>
     <button id="sendBtn" onclick="runAgent()" title="Send">↑</button>
   </div>
 
   <div class="footer-row">
     <button class="clear" onclick="clearChat()">Clear conversation</button>
-    <span>Weather data: Open-Meteo (free)</span>
+    <span>Weather data: wttr.in</span>
   </div>
 
 </div>
@@ -214,8 +233,22 @@
 
   const SYSTEM_PROMPT = `You are a friendly weather assistant. When users ask about weather, always use the get_weather tool to get real current data — never guess or make up weather information. After getting the data, give a helpful, conversational response. If asked to compare cities, call the tool once per city.`;
 
-  // ── KEY CHANGE: we now call our own backend instead of Anthropic directly ──
-  // The API key is stored safely on the server in an environment variable
+  // Updates the background image based on weather condition
+  function updateBackground(condition) {
+    const c = condition.toLowerCase();
+    let theme = 'sky,clouds';
+    if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) theme = 'rain,storm,dark+clouds';
+    else if (c.includes('snow') || c.includes('blizzard'))                    theme = 'snow,winter,blizzard';
+    else if (c.includes('clear') || c.includes('sunny'))                      theme = 'sunny,blue+sky,sunshine';
+    else if (c.includes('fog') || c.includes('mist'))                         theme = 'fog,mist,haze';
+    else if (c.includes('thunder') || c.includes('storm'))                    theme = 'thunderstorm,lightning';
+    else if (c.includes('overcast') || c.includes('cloudy'))                  theme = 'overcast,grey+clouds';
+
+    // Use a cache-busting timestamp so Unsplash gives a fresh image each time
+    const seed = Math.floor(Date.now() / 60000); // changes every minute
+    document.body.style.backgroundImage = `url('https://source.unsplash.com/1600x900/?${theme}&sig=${seed}')`;
+  }
+
   async function callClaude(messages) {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -237,7 +270,6 @@
     return response.json();
   }
 
-  // Calls our own /api/weather backend — avoids CORS issues
   async function executeTool(toolName, input) {
     if (toolName !== "get_weather") throw new Error(`Unknown tool: ${toolName}`);
 
@@ -251,6 +283,11 @@
 
     if (!response.ok) {
       return { error: data.error || `HTTP ${response.status}` };
+    }
+
+    // Update background to match the weather condition
+    if (data.condition) {
+      updateBackground(data.condition);
     }
 
     return data;
@@ -379,7 +416,7 @@
   function clearChat() {
     history = [];
     document.getElementById('chatWindow').innerHTML =
-      '<div class="empty-state" id="emptyState">Ask me about the weather anywhere in the world.<br/><span style="font-size:12px;color:#ddd;">Watch the blue bubble when I fetch live data.</span></div>';
+      '<div class="empty-state" id="emptyState">Ask me about the weather anywhere in the world.<br/><span style="font-size:12px;color:rgba(0,0,0,0.25);">Watch the blue bubble when I fetch live data.</span></div>';
   }
 
   const ta = document.getElementById('userInput');
