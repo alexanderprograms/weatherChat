@@ -9,7 +9,7 @@
 
     body {
       font-family: system-ui, sans-serif;
-      background-image: url('https://source.unsplash.com/1600x900/?sky,clouds');
+      background-image: url('https://picsum.photos/id/15/1600/900');
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
@@ -233,21 +233,30 @@
 
   const SYSTEM_PROMPT = `You are a friendly weather assistant. When users ask about weather, always use the get_weather tool to get real current data — never guess or make up weather information. After getting the data, give a helpful, conversational response. If asked to compare cities, call the tool once per city.`;
 
-  // Updates the background image based on weather condition
   function updateBackground(condition) {
-    const c = condition.toLowerCase();
-    let theme = 'sky,clouds';
-    if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) theme = 'rain,storm,dark+clouds';
-    else if (c.includes('snow') || c.includes('blizzard'))                    theme = 'snow,winter,blizzard';
-    else if (c.includes('clear') || c.includes('sunny'))                      theme = 'sunny,blue+sky,sunshine';
-    else if (c.includes('fog') || c.includes('mist'))                         theme = 'fog,mist,haze';
-    else if (c.includes('thunder') || c.includes('storm'))                    theme = 'thunderstorm,lightning';
-    else if (c.includes('overcast') || c.includes('cloudy'))                  theme = 'overcast,grey+clouds';
+  const c = condition.toLowerCase();
 
-    // Use a cache-busting timestamp so Unsplash gives a fresh image each time
-    const seed = Math.floor(Date.now() / 60000); // changes every minute
-    document.body.style.backgroundImage = `url('https://source.unsplash.com/1600x900/?${theme}&sig=${seed}')`;
-  }
+  // Picsum uses numeric IDs — we pick a set that matches each weather mood
+  const themes = {
+    rain:    [10, 411, 431, 338, 1040],
+    snow:    [397, 440, 443, 417, 372],
+    sunny:   [96, 110, 173, 257, 325],
+    fog:     [452, 488, 477, 390, 341],
+    storm:   [167, 211, 219, 305, 338],
+    cloudy:  [7, 101, 177, 237, 277],
+    default: [15, 42, 55, 68, 74]
+  };
+
+  let set = themes.default;
+  if (c.includes('rain') || c.includes('drizzle') || c.includes('shower')) set = themes.rain;
+  else if (c.includes('snow') || c.includes('blizzard'))                    set = themes.snow;
+  else if (c.includes('clear') || c.includes('sunny'))                      set = themes.sunny;
+  else if (c.includes('fog') || c.includes('mist'))                         set = themes.fog;
+  else if (c.includes('thunder') || c.includes('storm'))                    set = themes.storm;
+  else if (c.includes('overcast') || c.includes('cloudy'))                  set = themes.cloudy;
+
+  const id = set[Math.floor(Math.random() * set.length)];
+  document.body.style.backgroundImage = `url('https://picsum.photos/id/${id}/1600/900')`;
 
   async function callClaude(messages) {
     const response = await fetch('/api/chat', {
