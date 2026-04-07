@@ -1,5 +1,5 @@
 // api/weather.js
-// Fetches weather data server-side — avoids CORS issues with Open-Meteo
+// Uses wttr.in — simple, free, no API key, works from Vercel serverless functions
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,44 +12,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Step 1: Geocode city name to lat/lng
-    const geoRes = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
-    );
-    const geoData = await geoRes.json();
+    // wttr.in returns clean JSON with a single URL — no geocoding step needed
+    const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
 
-    if (!geoData.results || geoData.results.length === 0) {
-      return res.status(404).json({ error: `Could not find location: ${city}` });
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'weather-agent/1.0' }
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ error: `Weather service returned ${response.status}` });
     }
 
-    const place = geoData.results[0];
-    const { latitude, longitude, name: placeName, country } = place;
+    const data = await response.json();
 
-    // Step 2: Fetch current weather
-    const weatherRes = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,precipitation&timezone=auto`
-    );
-    const weatherData = await weatherRes.json();
-    const current = weatherData.current;
+    const current = data.current_condition[0];
+    const area = data.nearest_area[0];
 
-    const codes = {
-      0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-      45: "Foggy", 48: "Icy fog",
-      51: "Light drizzle", 53: "Moderate drizzle", 55: "Heavy drizzle",
-      61: "Light rain", 63: "Moderate rain", 65: "Heavy rain",
-      71: "Light snow", 73: "Moderate snow", 75: "Heavy snow",
-      80: "Light showers", 81: "Moderate showers", 82: "Heavy showers",
-      95: "Thunderstorm", 96: "Thunderstorm with hail"
-    };
+    const cityName = area.areaName[0].value;
+    const country = area.country[0].value;
 
     return res.status(200).json({
-      city: placeName,
+      city: cityName,
       country,
-      temperature_celsius: current.temperature_2m,
-      feels_like_celsius: current.apparent_temperature,
-      condition: codes[current.weathercode] || `Code ${current.weathercode}`,
-      wind_speed_kmh: current.windspeed_10m,
-      precipitation_mm: current.precipitation
+      temperature_celsius: parseInt(current.temp_C),
+      feels_like_celsius: parseInt(current.FeelsLikeC),
+      condition: current.weatherDesc[0].value,
+      wind_speed_kmh: parseInt(current.windspeedKmph),
+      precipitation_mm: parseFloat(current.precipMM),
+      humidity_percent: parseInt(current.humidity)
     });
 
   } catch (err) {
